@@ -1,0 +1,140 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2706
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+\margl1440\margr1440\vieww28600\viewh17440\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs24 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 # jump-tracker.spec \'97 v0.1.0 (draft)\
+\
+## 1. Purpose\
+Define a minimum viable, testable contract for extracting jump-related events and metrics from single-camera video.\
+\
+Primary outcomes:\
+- Ground Contact Time (GCT)\
+- Contact / flight segmentation\
+- Takeoff and landing timestamps\
+- Coarse foot contact pattern\
+- Coarse joint angle estimates (optional outputs)\
+\
+## 2. Definitions\
+- **Contact**: frames/time interval where at least one foot is in contact with the ground surface.\
+- **Flight**: frames/time interval where both feet are off the ground.\
+- **Takeoff**: transition from Contact \uc0\u8594  Flight.\
+- **Landing**: transition from Flight \uc0\u8594  Contact.\
+- **GCT**: duration of the Contact phase immediately preceding a Takeoff (for a jump), or immediately following a Landing (for a landing-only segment). The system MUST label which definition it used.\
+\
+Time conventions:\
+- All timestamps are in seconds, relative to the start of the input video (t=0.0).\
+- Frame indices are 0-based.\
+\
+## 3. Inputs\
+\
+### 3.1 Input object (logical)\
+Required:\
+- `video_uri` (string): local path or remote URL\
+- `fps` (number): frames per second\
+- `width` (int), `height` (int)\
+\
+Optional:\
+- `athlete_id` (string)\
+- `session_id` (string)\
+- `camera_view` (enum): `side` | `front` | `rear` | `unknown`\
+- `notes` (string)\
+\
+### 3.2 Preconditions\
+- Camera is stationary OR motion is correctable (stabilization allowed).\
+- Athlete is visible for the analyzed segment.\
+- Lighting is sufficient to segment feet/legs in most frames.\
+\
+## 4. Outputs\
+\
+### 4.1 Output object (logical)\
+Required:\
+- `spec` (string): `jump-tracker/0.1.0`\
+- `video_uri` (string): echo input\
+- `analysis_id` (string)\
+- `events` (array of Event)\
+- `metrics` (object)\
+- `confidence` (object)\
+\
+Optional:\
+- `overlays` (array): references to generated overlay artifacts (e.g., annotated video)\
+\
+### 4.2 Event schema\
+Each event MUST include:\
+- `type` (enum): `contact_start` | `contact_end` | `takeoff` | `landing`\
+- `t` (number): timestamp seconds\
+- `frame` (int): nearest frame index\
+- `side` (enum): `left` | `right` | `both` | `unknown`\
+- `confidence` (0..1)\
+\
+Rules:\
+- `takeoff` MUST coincide with a Contact \uc0\u8594  Flight transition boundary.\
+- `landing` MUST coincide with a Flight \uc0\u8594  Contact transition boundary.\
+- If uncertain, emit events with low confidence rather than omitting, unless no reasonable estimate exists.\
+\
+### 4.3 Metrics object\
+Required fields:\
+- `jumps_detected` (int)\
+- `gct_seconds` (array of number): one per jump, in chronological order\
+- `takeoff_times` (array of number)\
+- `landing_times` (array of number)\
+\
+Optional fields:\
+- `foot_contact_pattern` (array of enum): `forefoot` | `midfoot` | `rearfoot` | `unknown`\
+- `joint_angles` (array of JointAngleSample)\
+\
+### 4.4 JointAngleSample (optional)\
+- `t` (number)\
+- `frame` (int)\
+- `angles_deg` (object):\
+  - `ankle` (number|null)\
+  - `knee` (number|null)\
+  - `hip` (number|null)\
+- `confidence` (0..1)\
+\
+## 5. Calculation rules\
+\
+### 5.1 Jump segmentation\
+A \'93jump\'94 MUST be defined as:\
+- a `takeoff` followed by a `landing`\
+- with flight duration > 0.05s (to reject noise)\
+- and within a continuous visible segment\
+\
+### 5.2 GCT computation\
+For each jump i:\
+- Let `contact_start_i` be the start of the Contact phase that ends at `takeoff_i`\
+- Let `takeoff_i` be the takeoff timestamp\
+- Then `gct_i = takeoff_i - contact_start_i`\
+\
+If `contact_start_i` is missing, the system MUST:\
+- set `gct_i = null`\
+- include a reason in `confidence.notes` (see 6)\
+\
+### 5.3 Frame-to-time mapping\
+- `t = frame / fps`\
+- Report both time and frame for all events.\
+\
+## 6. Confidence reporting\
+The output MUST include:\
+\
+- `confidence.global` (0..1)\
+- `confidence.by_metric` (object): keys include `gct`, `takeoff`, `landing`, `foot_contact_pattern`, `joint_angles`\
+- `confidence.notes` (array of string): human-readable reasons for low confidence\
+\
+Examples of notes:\
+- "occlusion: feet not visible for 12 frames around takeoff"\
+- "motion_blur: high blur during landing window"\
+- "camera_view_unknown: heuristics may be degraded"\
+\
+## 7. Acceptance tests (spec-level)\
+A conforming implementation MUST be able to pass tests where:\
+\
+1. Given a synthetic timeline of Contact/Flight transitions, `events` are emitted with correct ordering.\
+2. `gct_seconds[i]` equals `takeoff_times[i] - contact_start_i` within \'b1(1/fps).\
+3. If the takeoff frame is ambiguous, `takeoff` confidence < 0.5 and a `confidence.notes` entry exists.\
+4. Output declares `spec = jump-tracker/0.1.0`.\
+}
