@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jump-tracker/0.1.0",
+  "title": "Jump Tracker Output Schema",
+  "type": "object",
+  "required": ["spec", "video_uri", "analysis_id", "events", "metrics", "confidence"],
+  "properties": {
+    "spec": { "type": "string", "const": "jump-tracker/0.1.0" },
+    "video_uri": { "type": "string", "minLength": 1 },
+    "analysis_id": { "type": "string", "minLength": 1 },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "confidence": { "$ref": "#/$defs/confidence" },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "side": {
+      "type": "string",
+      "enum": ["left", "right", "both", "unknown"]
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["contact_start", "contact_end", "takeoff", "landing"]
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "t", "frame", "side", "confidence"],
+      "properties": {
+        "type": { "$ref": "#/$defs/eventType" },
+        "t": { "type": "number", "minimum": 0 },
+        "frame": { "type": "integer", "minimum": 0 },
+        "side": { "$ref": "#/$defs/side" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "jumps_detected",
+        "takeoff_times",
+        "landing_times",
+        "gct_seconds",
+        "flight_seconds"
+      ],
+      "properties": {
+        "jumps_detected": { "type": "integer", "minimum": 0 },
+        "takeoff_times": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 }
+        },
+        "landing_times": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 }
+        },
+        "gct_seconds": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "number", "minimum": 0 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "flight_seconds": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "number", "minimum": 0 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "foot_contact_pattern": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["forefoot", "midfoot", "rearfoot", "unknown"]
+          }
+        },
+        "view": {
+          "type": "string",
+          "enum": ["side", "front", "rear", "unknown"]
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "object",
+      "required": ["global", "by_metric", "notes"],
+      "properties": {
+        "global": { "type": "number", "minimum": 0, "maximum": 1 },
+        "by_metric": {
+          "type": "object",
+          "required": ["takeoff", "landing", "gct", "flight"],
+          "properties": {
+            "takeoff": { "type": "number", "minimum": 0, "maximum": 1 },
+            "landing": { "type": "number", "minimum": 0, "maximum": 1 },
+            "gct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "flight": { "type": "number", "minimum": 0, "maximum": 1 },
+            "foot_contact_pattern": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
